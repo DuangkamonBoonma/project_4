@@ -1,0 +1,57 @@
+import pandas as pd
+import numpy as np
+from sklearn.impute import KNNImputer
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# อ่านข้อมูล
+df = pd.read_excel("filtered_output (2) 1.xlsx", sheet_name="Sheet2") # เปลี่ยนชื่อไฟล์ตามจริง
+print(df.head())
+
+# ลบคอลัมน์ Date หากมี (เพราะไม่สามารถใช้กับโมเดลโดยตรงได้)
+df = df.drop(columns=["Date"], errors='ignore')
+
+# แยก features และ target
+# Drop rows where the target variable 'dBZ' is missing
+df_cleaned = df.dropna(subset=["dBZ"])
+X = df_cleaned.drop(columns=["dBZ"])
+y = df_cleaned["dBZ"]
+
+# ฟังก์ชันวัด MAE RMSE
+def evaluate_model(X_imputed, y):
+    X_train, X_test, y_train, y_test = train_test_split(X_imputed, y, test_size=0.2, random_state=42)
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    model = RandomForestRegressor(random_state=42)
+    model.fit(X_train_scaled, y_train)
+    y_pred = model.predict(X_test_scaled)
+
+    mae = mean_absolute_error(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = np.sqrt(mse) # Calculate RMSE from MSE
+    return mae, rmse
+
+# ----------- วิธีที่ 1: เติมค่าด้วย KNN -----------
+# Replace '-' with NaN
+X = X.replace('-', np.nan)
+knn_imputer = KNNImputer(n_neighbors=5)
+X_knn = knn_imputer.fit_transform(X)
+mae_knn, rmse_knn = evaluate_model(X_knn, y)
+
+# ----------- วิธีที่ 2: เติมค่าด้วย Random Forest -----------
+rf_imputer = IterativeImputer(estimator=RandomForestRegressor(random_state=42), random_state=42)
+X_rf = rf_imputer.fit_transform(X)
+mae_rf, rmse_rf = evaluate_model(X_rf, y)
+
+print("--------- ผลลัพธ์การประเมินโมเดลหลังเติม Missing Data ---------")
+print(f"KNN Imputer:     MAE = {mae_knn:.2f}, RMSE = {rmse_knn:.2f}")
+print(f"RF Imputer:      MAE = {mae_rf:.2f}, RMSE = {rmse_rf:.2f}")
+
+
