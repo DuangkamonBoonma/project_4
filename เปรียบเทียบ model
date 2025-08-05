@@ -1,0 +1,79 @@
+import pandas as pd
+import numpy as np
+from sklearn.impute import KNNImputer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from xgboost import XGBRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score 
+
+# โหลดข้อมูลจาก Excel
+df = pd.read_excel("/content/filtered_output (2) 1.xlsx", sheet_name="Sheet2")
+
+# ลบคอลัมน์ Date หากมี
+df = df.drop(columns=["Date"], errors='ignore')
+
+# แยก features และ target
+X = df.drop(columns=["dBZ"])
+y = df["dBZ"]
+
+# ------------------- เติมค่า missing ด้วย KNN -------------------
+# Convert non-numeric values to NaN using errors='coerce'
+X = X.apply(pd.to_numeric, errors='coerce')
+
+imputer = KNNImputer(n_neighbors=5)
+X_imputed = imputer.fit_transform(X)
+
+# ------------------- แบ่งข้อมูล -------------------
+X_train, X_test, y_train, y_test = train_test_split(X_imputed, y, test_size=0.2, random_state=42)
+
+# ------------------- สเกลข้อมูล -------------------
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# ------------------- ฟังก์ชันประเมินผล -------------------
+def evaluate_model(name, model, X_train, X_test, y_train, y_test):
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    mae = mean_absolute_error(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred) # Calculate MSE
+    rmse = np.sqrt(mse) # Calculate RMSE manually
+    r2 = r2_score(y_test, y_pred)
+    print(f"{name:<20} | MAE: {mae:.2f} | RMSE: {rmse:.2f} | R²: {r2:.2f}")
+    return mae, rmse, r2
+
+# ------------------- สร้างและประเมินโมเดล -------------------
+print("Model Comparison (after KNN Imputation):")
+print("-" * 65)
+
+# Impute missing values in y_train and y_test
+from sklearn.impute import SimpleImputer
+imputer_y = SimpleImputer(strategy='mean')
+y_train_imputed = imputer_y.fit_transform(y_train.values.reshape(-1, 1)).ravel()
+y_test_imputed = imputer_y.transform(y_test.values.reshape(-1, 1)).ravel()
+
+# Linear Regression
+lr = LinearRegression()
+evaluate_model("Linear Regression", lr, X_train_scaled, X_test_scaled, y_train_imputed, y_test_imputed)
+
+# Impute missing values in y_train and y_test for Random Forest
+from sklearn.impute import SimpleImputer
+imputer_y = SimpleImputer(strategy='mean')
+y_train_imputed_rf = imputer_y.fit_transform(y_train.values.reshape(-1, 1)).ravel()
+y_test_imputed_rf = imputer_y.transform(y_test.values.reshape(-1, 1)).ravel()
+
+# Random Forest
+rf = RandomForestRegressor(random_state=42)
+evaluate_model("Random Forest", rf, X_train_scaled, X_test_scaled, y_train_imputed_rf, y_test_imputed_rf)
+
+# Impute missing values in y_train and y_test for XGBoost
+from sklearn.impute import SimpleImputer
+imputer_y = SimpleImputer(strategy='mean')
+y_train_imputed_xgb = imputer_y.fit_transform(y_train.values.reshape(-1, 1)).ravel()
+y_test_imputed_xgb = imputer_y.transform(y_test.values.reshape(-1, 1)).ravel()
+
+# XGBoost
+xgb = XGBRegressor(random_state=42, verbosity=0)
+evaluate_model("XGBoost", xgb, X_train_scaled, X_test_scaled, y_train_imputed_xgb, y_test_imputed_xgb)
