@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>ระบบพยากรณ์พายุฝนฟ้าคะนอง</title>
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(to bottom right, #2a2a2a, #3b3b3b, #ff8c42);
+        color: #fff;
+    }
+
+    .container {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 30px;
+        flex-wrap: wrap;
+    }
+
+    .panel {
+        background: rgba(200, 200, 200, 0.1);
+        border-radius: 12px;
+        padding: 20px;
+        flex: 1 1 400px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        backdrop-filter: blur(6px);
+    }
+
+    h2 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: #ff9f1c;
+        text-shadow: 1px 1px 5px rgba(0,0,0,0.7);
+    }
+
+    h3 {
+        margin-top: 20px;
+        margin-bottom: 10px;
+        color: #ffd27f;
+        text-align: left;
+    }
+
+    label.location, label.index {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: bold;
+        color: #ffd27f;
+    }
+
+    input[type="text"], input[type="file"] {
+        width: 95%;
+        padding: 8px;
+        border: none;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        background: #333;
+        color: #fff;
+        font-size: 14px;
+    }
+
+    .btn-primary {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(to right, #ff512f, #dd2476);
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        transition: transform 0.2s, background 0.3s;
+    }
+
+    .btn-primary:hover {
+        transform: scale(1.05);
+        background: linear-gradient(to right, #dd2476, #ff512f);
+    }
+
+    .result-panel {
+        background: #ff9f1c;
+        border-radius: 12px;
+        padding: 30px 20px;
+        text-align: center;
+        margin-top: 15px;
+        transition: background 0.3s;
+    }
+
+    .result-panel h1 {
+        font-size: 4em;
+        margin: 0;
+        color: #000;
+    }
+
+    .result-panel p {
+        margin: 5px 0;
+        color: #000;
+        font-weight: bold;
+        font-size: 1.2em;
+    }
+
+    .forecast-card {
+        border-radius: 10px;
+        padding: 10px;
+        margin: 8px 0;
+        text-align: center;
+        font-weight: bold;
+        color: #000;
+    }
+
+    .legend {
+        margin-top: 20px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .color-box {
+        width: 20px;
+        height: 20px;
+        margin-right: 10px;
+        border-radius: 4px;
+        border: 1px solid #000;
+    }
+
+    .green { background: #2ecc71; }
+    .yellow { background: #f1c40f; }
+    .orange { background: #ff9f1c; }
+    .red { background: #e74c3c; }
+
+    @media (max-width: 900px) {
+        .container { flex-direction: column; }
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <!-- ฝั่งซ้าย: อัปโหลดไฟล์ -->
+    <div class="panel">
+        <h2>📍 กรอกข้อมูล</h2>
+
+        <h3>ข้อมูลตำแหน่ง</h3>
+        <label class="location">จังหวัด:</label>
+        <input type="text" id="province" placeholder="เช่น เชียงใหม่">
+        <label class="location">อำเภอ:</label>
+        <input type="text" id="district" placeholder="เช่น เมือง">
+
+        <h3>📂 ข้อมูลดัชนี</h3>
+        <label class="index">อัปโหลดไฟล์ CSV:</label>
+        <input type="file" id="csvFile" accept=".csv">
+
+        <p style="font-size:13px; color:#ffd27f; margin-top:5px;">
+            ⚠️ ใช้เฉพาะคอลัมน์ที่โมเดลรองรับ (16 ดัชนี)
+        </p>
+
+        <button type="button" id="predictBtn" class="btn-primary">🌩️ เริ่มพยากรณ์</button>
+    </div>
+
+    <!-- ฝั่งขวา: ผลลัพธ์ -->
+    <div class="panel">
+        <h2>ระบบพยากรณ์ความรุนแรงพายุฝนฟ้าคะนอง</h2>
+        <h3>ผลลัพธ์การพยากรณ์</h3>
+        <p>วันที่: <span id="date"></span></p>
+
+        <div class="result-panel" id="resultPanel">
+            <h1 id="chance">0%</h1>
+            <p id="severity">ความรุนแรง: -</p>
+        </div>
+
+        <!-- ✅ พยากรณ์ล่วงหน้า -->
+        <div id="forecast3days"></div>
+
+        <!-- ✅ Legend -->
+        <div class="legend">
+            <h3>ระดับความรุนแรง</h3>
+            <div class="legend-item"><div class="color-box green"></div><span>เขียว = ต่ำ (ปลอดภัย)</span></div>
+            <div class="legend-item"><div class="color-box yellow"></div><span>เหลือง = ปานกลาง (ควรระวัง)</span></div>
+            <div class="legend-item"><div class="color-box orange"></div><span>ส้ม = สูง (มีความเสี่ยง)</span></div>
+            <div class="legend-item"><div class="color-box red"></div><span>แดง = รุนแรงมาก (อันตรายสูงสุด)</span></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ฟังก์ชันอ่าน CSV เป็น Object
+function parseCSV(text) {
+    const rows = text.trim().split("\n");
+    const headers = rows[0].split(",");
+    const values = rows[1].split(",");
+
+    let data = {};
+    headers.forEach((h, i) => {
+        data[h.trim()] = parseFloat(values[i]) || 0;
+    });
+    return data;
+}
+
+// ฟังก์ชันพยากรณ์ล่วงหน้า 3 วัน
+function forecastNextDays(baseChance) {
+    let forecasts = [];
+    for (let i = 1; i <= 3; i++) {
+        let variation = (Math.random() * 20 - 10);
+        let nextChance = Math.min(100, Math.max(0, baseChance + variation));
+
+        let severity="", color="";
+        if(nextChance < 30){ severity="ต่ำ"; color="#2ecc71"; }
+        else if(nextChance < 50){ severity="ปานกลาง"; color="#f1c40f"; }
+        else if(nextChance < 75){ severity="สูง"; color="#ff9f1c"; }
+        else { severity="รุนแรงมาก"; color="#e74c3c"; }
+
+        let today = new Date();
+        today.setDate(today.getDate() + i);
+
+        forecasts.push({
+            day: today.toLocaleDateString('th-TH'),
+            chance: Math.round(nextChance),
+            severity: severity,
+            color: color
+        });
+    }
+    return forecasts;
+}
+
+document.getElementById("predictBtn").addEventListener("click", function() {
+    let fileInput = document.getElementById("csvFile");
+    if (fileInput.files.length === 0) {
+        alert("กรุณาเลือกไฟล์ CSV ก่อน");
+        return;
+    }
+
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        let text = e.target.result;
+        let data = parseCSV(text);
+
+        // ✅ ใช้เฉพาะดัชนีที่โมเดลกำหนด
+        let indices = [
+            data["Showalter"], data["Lifted"], data["SWEAT"], data["K"],
+            data["Cross"], data["Vertical"], data["TT_Totals"], data["CAPE"],
+            data["CIN"], data["LCL_Temp"], data["LCL_P"], data["LCL_P1"],
+            data["MML_theta"], data["MML_q"], data["Thickness"], data["PWAT"]
+        ].map(v => v || 0);
+
+        // สูตรถ่วงน้ำหนัก (ตัวอย่าง)
+        let weights = [1,1,0.5,0.5,0.3,0.3,0.5,2,-1,0.5,0.5,0.5,0.3,0.3,0.2,0.5];
+        let chance = 0;
+        for (let i = 0; i < indices.length; i++) {
+            chance += indices[i] * weights[i];
+        }
+
+        chance = Math.min(100, Math.max(0, chance));
+
+        // ✅ severity
+        let severity="", color="";
+        if(chance < 30){ severity="ต่ำ"; color="#2ecc71"; }
+        else if(chance < 50){ severity="ปานกลาง"; color="#f1c40f"; }
+        else if(chance < 75){ severity="สูง"; color="#ff9f1c"; }
+        else { severity="รุนแรงมาก"; color="#e74c3c"; }
+
+        // ✅ ส่งไปฝั่งขวา
+        document.getElementById("chance").innerText = Math.round(chance) + "%";
+        document.getElementById("severity").innerText = "ความรุนแรง: " + severity;
+        document.getElementById("resultPanel").style.background = color;
+        document.getElementById("date").innerText = new Date().toLocaleDateString('th-TH');
+
+        // ✅ พยากรณ์ 3 วันถัดไป
+        let forecasts = forecastNextDays(chance);
+        let forecastDiv = document.getElementById("forecast3days");
+        forecastDiv.innerHTML = "<h3>🔮 พยากรณ์ล่วงหน้า 3 วัน</h3>";
+        forecasts.forEach(f => {
+            forecastDiv.innerHTML += `
+                <div class="forecast-card" style="background:${f.color}">
+                    <p>${f.day}</p>
+                    <p>${f.chance}% (${f.severity})</p>
+                </div>
+            `;
+        });
+    };
+    reader.readAsText(fileInput.files[0]);
+});
+</script>
+</body>
+</html>

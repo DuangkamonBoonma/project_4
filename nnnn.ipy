@@ -1,0 +1,116 @@
+import pandas as pd
+import numpy as np
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+import openpyxl
+
+# โหลดข้อมูลจาก Sheet2 ของไฟล์ Excel
+df = pd.read_excel(r"D:\Projeck\new data.xlsx", sheet_name="Sheet2")
+
+# แสดง 5 แถวแรก
+#print(df.head())
+
+# ----------------- ลบค่า '-' -----------------
+df = df.replace('-', np.nan)
+df = df.apply(pd.to_numeric, errors='ignore')
+df = df.dropna()
+
+# ----------------- แปลง Date เป็น datetime -----------------
+df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+
+# สร้างคอลัมน์ใหม่: วัน / เดือน / ปี
+df['Year'] = df['Date'].dt.year
+df['Month'] = df['Date'].dt.month
+df['Day'] = df['Date'].dt.day
+df['DayOfWeek'] = df['Date'].dt.dayofweek
+df['Month_sin'] = np.sin(2 * np.pi * df['Month']/12)
+df['Month_cos'] = np.cos(2 * np.pi * df['Month']/12)
+
+
+# ----------------- แยก X, y -----------------
+X = df.drop(['Date', 'dBZ', 'Year'], axis=1, errors='ignore')
+y = df['dBZ']
+
+# ----------------- คำนวณ Correlation -----------------
+corr = X.corrwith(y)
+
+# เลือกเก็บและตัดออก
+selected_features = corr[abs(corr) >= 0.05].index.tolist()
+removed_features = corr[abs(corr) < 0.05].index.tolist()
+
+# ----------------- สร้าง X ใหม่ -----------------
+X_selected = X[selected_features]
+
+# ----------------- แสดงผล -----------------
+# print("✅ คอลัมน์ที่ถูกเก็บไว้ (Correlation >= 0.05):")
+# print(selected_features)
+
+# print("\n❌ คอลัมน์ที่ถูกตัดออก (Correlation < 0.05):")
+# print(removed_features)
+
+# ----------------- แสดงสรุปข้อมูล -----------------
+
+# print("📌 ขนาดของข้อมูล X_selected:", X_selected.shape)   # จำนวนแถว, คอลัมน์
+# print("\n✅ คอลัมน์ที่ถูกเก็บไว้ (Correlation >= 0.05):")
+# print(selected_features)
+
+# print("\n❌ คอลัมน์ที่ถูกตัดออก (Correlation < 0.05):")
+# print(removed_features)
+
+# print("\n🔎 ตัวอย่างข้อมูล 5 แถวแรก:")
+# print(X_selected.head())
+
+# print("\n📊 ข้อมูลเชิงสถิติ (Descriptive Statistics):")
+# print(X_selected.describe())
+
+# print("\nℹ️ ข้อมูลของ DataFrame:")
+# print(X_selected.info())
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import numpy as np
+
+# ติดตั้ง XGBoost ก่อน (ถ้ายังไม่มี ให้รันใน terminal/colab)
+# pip install xgboost
+from xgboost import XGBRegressor
+
+# ----------------- แบ่ง Train/Test -----------------
+X_train, X_test, y_train, y_test = train_test_split(
+    X_selected, y, test_size=0.2, random_state=42
+)
+
+# ----------------- สร้างโมเดล -----------------
+models = {
+    "Linear Regression": LinearRegression(),
+    "Decision Tree": DecisionTreeRegressor(random_state=42),
+    "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
+    "XGBoost": XGBRegressor(n_estimators=100, random_state=42, verbosity=0)
+}
+
+# ----------------- เทรนและประเมินผล -----------------
+results = {}
+
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    mae = mean_absolute_error(y_test, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    r2 = r2_score(y_test, y_pred)
+
+    results[name] = {"MAE": mae, "RMSE": rmse, "R²": r2}
+
+# ----------------- แสดงผล -----------------
+print("📊 ผลการเปรียบเทียบโมเดล\n")
+for name, metrics in results.items():
+    print(f"--- {name} ---")
+    print(f"MAE  = {metrics['MAE']:.4f}")
+    print(f"RMSE = {metrics['RMSE']:.4f}")
+    print(f"R²   = {metrics['R²']:.4f}")
+    print()
+

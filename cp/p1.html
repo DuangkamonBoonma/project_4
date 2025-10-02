@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>ฟ้าแลบสมจริง</title>
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+}
+
+/* พื้นหลังเต็มจอ */
+body {
+    background: url("f1.jpg") no-repeat center center/cover; /* ใส่รูปฟ้าเต็มจอ */
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* Overlay สีดำอ่อนลงเพื่อให้ภาพเห็นชัด */
+    background-color: rgba(0, 0, 0, 0.15);
+    background-blend-mode: darken;
+}
+
+/* Container ตัวหนังสือและปุ่มตรงกลาง */
+.container {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 30px 50px;
+    background: rgba(0,0,0,0.45); /* เข้มขึ้นเล็กน้อยเพื่อกรอบชัด */
+    border-radius: 12px;
+    backdrop-filter: blur(6px);
+    display: inline-block; /* เล็กพอดีกับเนื้อหา */
+    border: 2px solid rgba(255, 235, 59, 0.8); /* ขอบกรอบสีเหลืองชัดเจน */
+    box-shadow: 0 0 20px rgba(255, 235, 59, 0.5); /* เพิ่ม glow */
+}
+
+.container h1 {
+    font-size: 2.5em;
+    margin-bottom: 20px;
+    color: #ffeb3b;
+    text-shadow: 1px 1px 6px rgba(0,0,0,0.8),
+                 0 0 10px #ffeb3b;
+}
+
+.container button {
+    font-size: 1.2em;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(45deg, #ff512f, #dd2476);
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    transition: transform 0.2s ease, background 0.3s ease;
+}
+
+.container button:hover {
+    transform: scale(1.05);
+    background: linear-gradient(45deg, #dd2476, #ff512f);
+}
+
+/* Canvas overlay สำหรับวางรูปสายฟ้า */
+#lightningCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1; /* อยู่ใต้ container */
+    pointer-events: none;
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>พยากรณ์<br>พายุฝนฟ้าคะนอง</h1>
+    <form action="p2.html" method="get">
+        <button type="submit">เริ่มต้นใช้งาน</button>
+    </form>
+</div>
+
+<canvas id="lightningCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('lightningCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// โหลดรูปสายฟ้า
+const lightningImg = new Image();
+lightningImg.src = "static/lightning.png"; // ใส่รูปสายฟ้า 'ใส่รูป'
+
+function drawLightningImage(x, y, scale = 1) {
+    const imgWidth = lightningImg.width * scale;
+    const imgHeight = lightningImg.height * scale;
+    ctx.drawImage(lightningImg, x - imgWidth/2, y - imgHeight/2, imgWidth, imgHeight);
+}
+
+function getLightningPoints() {
+    const w = canvas.width;
+    const h = canvas.height;
+    return [
+        [0, 0], [w/2, 0], [w, 0],
+        [0, h/2], [w/2, h/2], [w, h/2],
+        [0, h], [w/2, h], [w, h]
+    ];
+}
+
+function flash() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const points = getLightningPoints();
+    points.forEach(([x, y]) => {
+        if (Math.random() < 0.6) {
+            const scale = 0.5 + Math.random() * 0.5;
+            drawLightningImage(x, y, scale);
+        }
+    });
+
+    // flash effect เล็ก ๆ
+    document.body.style.filter = "brightness(1.4)";
+    setTimeout(() => document.body.style.filter = "brightness(1)", 100 + Math.random() * 150);
+
+    const nextFlash = 500 + Math.random() * 800;
+    setTimeout(flash, nextFlash);
+}
+
+// เริ่มแสดงหลังโหลดรูป
+lightningImg.onload = flash;
+</script>
+</body>
+</html>

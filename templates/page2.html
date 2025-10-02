@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>ระบบพยากรณ์พายุฝนฟ้าคะนอง</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+    body {margin: 0; padding: 0; font-family: "Segoe UI", Tahoma, sans-serif;
+          background: linear-gradient(to bottom right, #2a2a2a, #3b3b3b, #ff8c42); color: #fff;}
+    .container {display: flex; justify-content: space-between; gap: 20px; padding: 30px; flex-wrap: wrap;}
+    .panel {background: rgba(200,200,200,0.1); border-radius: 12px; padding: 20px; flex: 1 1 400px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(6px);}
+    h2 {text-align: center; margin-bottom: 20px; color: #ff9f1c; text-shadow: 1px 1px 5px rgba(0,0,0,0.7);}
+    label {display: block; margin-bottom: 6px; font-weight: bold; color: #ffd27f;}
+    input {width: 95%; padding: 8px; border: none; border-radius: 6px; margin-bottom: 15px; background: #333; color: #fff;}
+    .btn-primary {display: block; width: 100%; padding: 12px; background: linear-gradient(to right, #ff512f, #dd2476);
+                  border: none; border-radius: 8px; color: white; font-size: 16px; font-weight: bold; cursor: pointer;
+                  box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s, background 0.3s;}
+    .btn-primary:hover {transform: scale(1.05); background: linear-gradient(to right, #dd2476, #ff512f);}
+    
+    /* กล่องผลลัพธ์ */
+    .results-container {display: flex; flex-direction: column; gap: 25px;}
+    .result-today {
+        border-radius: 15px; padding: 30px; text-align: center; font-weight: bold; 
+        color: black; font-size: 1.6rem;
+    }
+    .result-future-container {display: flex; justify-content: space-between; gap: 15px;}
+    .result-future {
+        flex: 1; border-radius: 12px; padding: 20px; text-align: center; font-weight: bold;
+        color: black; font-size: 1rem;
+    }
+    .result-date {font-size: 1.2rem; font-weight: bold; color: black; margin-bottom: 10px;}
+
+    /* ✅ ตัวเลขเปอร์เซ็นต์ */
+    .result-today h1 {
+        font-size: 3em;
+        margin: 0;
+        -webkit-text-stroke: 2px #000;   /* ขอบดำ */
+        color: inherit;                  /* ใช้สีเดียวกับพื้น */
+    }
+    .result-future h2 {
+        font-size: 2em;
+        margin: 5px 0;
+        -webkit-text-stroke: 1.5px #000; /* ขอบดำ */
+        color: inherit;                  /* ใช้สีเดียวกับพื้น */
+    }
+
+    .legend {margin-top: 20px;}
+    .legend-item {display: flex; align-items: center; margin-bottom: 8px;}
+    .color-box {width: 20px; height: 20px; margin-right: 10px; border-radius: 4px; border: 1px solid #000;}
+    .green {background: #2ecc71;}
+    .yellow {background: #f1c40f;}
+    .orange {background: #ff9f1c;}
+    .red {background: #e74c3c;}
+    small {color: #ddd; font-size: 12px; display:block; margin-top:5px;}
+</style>
+</head>
+<body>
+<div class="container">
+   <!-- ฝั่งซ้าย -->
+<div class="panel">
+    <h2>📍 กรอกข้อมูลเพื่อพยากรณ์</h2>
+
+    <h3>อัปโหลดไฟล์ข้อมูล (.csv หรือ .xlsx)</h3>
+    <p style="font-size:14px; color:#ffd27f; margin-top:-5px;">
+        (*ไฟล์ต้องมีคอลัมน์: ดัชนีที่ต้องการทั้งหมด, วันที่, จังหวัด, อำเภอ อย่างน้อยย้อนหลัง 5 วัน)
+    </p>
+    
+    <input type="file" id="fileInput" accept=".csv,.xlsx">
+    
+    <button type="button" id="predictBtn" class="btn-primary">
+        🌩️ เริ่มพยากรณ์
+    </button>
+
+    <small>
+        หมายเหตุ:  
+        - <b>วันที่</b> ใช้เพื่อระบุลำดับเวลา  
+        - <b>จังหวัด, อำเภอ</b> ใช้แสดงผลพยากรณ์  
+        - <b>ดัชนี</b> เช่น Showalter, Lifted, SWEAT ฯลฯ ใช้คำนวณความเสี่ยง  
+        - ต้องมีข้อมูลย้อนหลัง ≥ 5 วัน เพื่อเพิ่มความแม่นยำ  
+    </small>
+</div>
+
+    <!-- ฝั่งขวา -->
+    <div class="panel">
+        <h2>ผลการพยากรณ์</h2>
+        <div id="results" class="results-container"></div>
+        <!-- legend -->
+        <div class="legend">
+            <h3>ระดับความรุนแรง</h3>
+            <div class="legend-item"><div class="color-box green"></div><span>เขียว = ต่ำ (ปลอดภัย)</span></div>
+            <div class="legend-item"><div class="color-box yellow"></div><span>เหลือง = ปานกลาง (ควรระวัง)</span></div>
+            <div class="legend-item"><div class="color-box orange"></div><span>ส้ม = สูง (มีความเสี่ยง)</span></div>
+            <div class="legend-item"><div class="color-box red"></div><span>แดง = รุนแรงมาก (อันตรายสูงสุด)</span></div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById("predictBtn").addEventListener("click", async function() {
+  const file = document.getElementById("fileInput").files[0];
+  if (!file) { alert("กรุณาอัปโหลดไฟล์ก่อน"); return; }
+
+  const fd = new FormData(); fd.append("file", file);
+  try {
+    const res  = await fetch("/predict", { method: "POST", body: fd });
+    const data = await res.json();
+
+    if (data.error) {
+      document.getElementById("results").innerHTML = `<p style="color:#ff6b6b">${data.error}</p>`;
+      return;
+    }
+
+    const loc = data.location || {province:"-", district:"-"};
+    let html = "";
+
+    // ✅ วันนี้ (กล่องใหญ่)
+    const today = data.predictions[0];
+    html += `
+      <div class="result-today" style="background:${today.color}">
+        <div class="result-date">${today.date}</div>
+        <h1>${today.probability}%</h1>
+        <p>ความรุนแรง: ${today.severity}</p>
+        <p>📍 พื้นที่: ${today.district} จ.${today.province}</p>
+      </div>`;
+
+    // ✅ 3 วันถัดไป (กล่องเล็ก)
+    html += `<div class="result-future-container">`;
+    data.predictions.slice(1).forEach(p => {
+      html += `
+        <div class="result-future" style="background:${p.color}">
+          <div class="result-date">${p.date}</div>
+          <h2>${p.probability}%</h2>
+          <p>ความรุนแรง: ${p.severity}</p>
+          <p>📍 พื้นที่: ${p.district} จ.${p.province}</p>
+        </div>`;
+    });
+    html += `</div>`;
+
+    document.getElementById("results").innerHTML = html;
+
+  } catch (err) {
+    document.getElementById("results").innerHTML = `<p style="color:#ff6b6b">❌ ${err}</p>`;
+  }
+});
+</script>
+</body>
+</html>
